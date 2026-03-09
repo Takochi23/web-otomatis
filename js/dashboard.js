@@ -50,14 +50,16 @@ async function fetchTransactions() {
   const res = await fetch(`${MOCKAPI_BASE_URL}/transactions`);
   if (!res.ok) throw new Error('Gagal mengambil data transaksi');
   const data = await res.json();
-  const userId = String(user.id);
+  const filterId = String(user.id).trim();
   
   const filtered = data.filter(t => {
-    const dbUserId = String(t.userId).trim();
-    // Match either exactly "1", "userId 1", or "user 1"
-    return dbUserId === userId || 
-           dbUserId === `userId ${userId}` || 
-           dbUserId === `user ${userId}`;
+    // If we have our custom 'uid' from the new code, use that safely
+    if (t.uid && String(t.uid).trim() === filterId) return true;
+
+    // Fallback for legacy data without 'uid'
+    let dbId = String(t.userId || t.userid).trim();
+    dbId = dbId.replace(/^(userid|user id|userId|user)\s+/i, '');
+    return dbId === filterId;
   });
   
   allTransactions = filtered.sort((a, b) => new Date(b.date) - new Date(a.date));
@@ -69,17 +71,20 @@ async function addTransaction(tx) {
   const res = await fetch(`${MOCKAPI_BASE_URL}/transactions`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ ...tx, userId: user.id }),
+    // MockAPI overrides `userId` with its own auto-faker strings (e.g "userId 2").
+    // To fix this, we store the actual user id in a custom field `uid`.
+    body: JSON.stringify({ ...tx, userId: user.id, uid: String(user.id) }),
   });
   if (!res.ok) throw new Error('Gagal menambah transaksi');
   return res.json();
 }
 
 async function updateTransaction(id, tx) {
+  const user = getUser();
   const res = await fetch(`${MOCKAPI_BASE_URL}/transactions/${id}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(tx),
+    body: JSON.stringify({ ...tx, uid: String(user.id) }),
   });
   if (!res.ok) throw new Error('Gagal mengupdate transaksi');
   return res.json();
