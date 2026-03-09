@@ -21,14 +21,30 @@ function logout() {
   window.location.href = 'index.html';
 }
 
+// ─── Helper: normalise user object ────────────────────────────────────────────
+// MockAPI names the Object-ID field "userid" (not "id") in the user resource.
+// We always expose it as .id so the rest of the app works uniformly.
+function normalizeUser(user) {
+  return { ...user, id: user.id || user.userid || user.userId };
+}
+
 // ─── Auth API ─────────────────────────────────────────────────────────────────
 async function login(email, password) {
-  const res = await fetch(
-    `${MOCKAPI_BASE_URL}/user?email=${encodeURIComponent(email)}`
-  );
-  if (!res.ok) throw new Error('Gagal terhubung ke server');
+  let res;
+  try {
+    res = await fetch(
+      `${MOCKAPI_BASE_URL}/user?email=${encodeURIComponent(email)}`
+    );
+  } catch (_) {
+    throw new Error('Tidak dapat terhubung ke internet. Periksa koneksi Anda.');
+  }
+
+  if (!res.ok)
+    throw new Error(`Gagal terhubung ke server (HTTP ${res.status})`);
 
   const users = await res.json();
+
+  // Filter client-side (MockAPI filter is case-sensitive)
   const user = users.find(
     u =>
       u.email.toLowerCase() === email.toLowerCase() &&
@@ -36,30 +52,47 @@ async function login(email, password) {
   );
 
   if (!user) throw new Error('Email atau password salah');
-  saveUser(user);
-  return user;
+
+  const normalized = normalizeUser(user);
+  saveUser(normalized);
+  return normalized;
 }
 
 async function register(name, email, password) {
-  // Check email uniqueness
-  const checkRes = await fetch(
-    `${MOCKAPI_BASE_URL}/user?email=${encodeURIComponent(email)}`
-  );
-  if (!checkRes.ok) throw new Error('Gagal terhubung ke server');
+  // 1. Check email uniqueness
+  let checkRes;
+  try {
+    checkRes = await fetch(
+      `${MOCKAPI_BASE_URL}/user?email=${encodeURIComponent(email)}`
+    );
+  } catch (_) {
+    throw new Error('Tidak dapat terhubung ke internet. Periksa koneksi Anda.');
+  }
+
+  if (!checkRes.ok)
+    throw new Error(`Gagal terhubung ke server (HTTP ${checkRes.status})`);
 
   const existing = await checkRes.json();
   if (existing.some(u => u.email.toLowerCase() === email.toLowerCase())) {
     throw new Error('Email sudah terdaftar. Silakan login.');
   }
 
-  const res = await fetch(`${MOCKAPI_BASE_URL}/user`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name, email, password }),
-  });
+  // 2. Create user
+  let res;
+  try {
+    res = await fetch(`${MOCKAPI_BASE_URL}/user`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, email, password }),
+    });
+  } catch (_) {
+    throw new Error('Tidak dapat terhubung ke internet. Periksa koneksi Anda.');
+  }
 
-  if (!res.ok) throw new Error('Gagal membuat akun');
+  if (!res.ok) throw new Error(`Gagal membuat akun (HTTP ${res.status})`);
+
   const user = await res.json();
-  saveUser(user);
-  return user;
+  const normalized = normalizeUser(user);
+  saveUser(normalized);
+  return normalized;
 }
