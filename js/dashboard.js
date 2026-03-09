@@ -46,20 +46,30 @@ function formatDate(dateStr) {
 // ─── API calls ────────────────────────────────────────────────────────────────
 async function fetchTransactions() {
   const user = getUser();
-  // Fetch all transactions then filter client-side.
   const res = await fetch(`${MOCKAPI_BASE_URL}/transactions`);
   if (!res.ok) throw new Error('Gagal mengambil data transaksi');
-  const data = await res.json();
+  let data = await res.json();
   const filterId = String(user.id).trim();
   
   const filtered = data.filter(t => {
-    // If we have our custom 'uid' from the new code, use that safely
-    if (t.uid && String(t.uid).trim() === filterId) return true;
+    // Check if the authentic userId is piggybacked on the title string
+    if (t.title && t.title.includes('|||')) {
+      const parts = t.title.split('|||');
+      if (parts[0] === filterId) return true;
+      return false;
+    }
 
-    // Fallback for legacy data without 'uid'
+    // Fallback for legacy data 
     let dbId = String(t.userId || t.userid).trim();
     dbId = dbId.replace(/^(userid|user id|userId|user)\s+/i, '');
     return dbId === filterId;
+  });
+
+  // Clean the title for UI presentation
+  filtered.forEach(t => {
+    if (t.title && t.title.includes('|||')) {
+      t.title = t.title.split('|||')[1];
+    }
   });
   
   allTransactions = filtered.sort((a, b) => new Date(b.date) - new Date(a.date));
@@ -68,12 +78,12 @@ async function fetchTransactions() {
 
 async function addTransaction(tx) {
   const user = getUser();
+  // MockAPI drops custom fields and overrides userId. We piggyback the user ID onto the title string.
+  const encodedTitle = `${user.id}|||${tx.title}`;
   const res = await fetch(`${MOCKAPI_BASE_URL}/transactions`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    // MockAPI overrides `userId` with its own auto-faker strings (e.g "userId 2").
-    // To fix this, we store the actual user id in a custom field `uid`.
-    body: JSON.stringify({ ...tx, userId: user.id, uid: String(user.id) }),
+    body: JSON.stringify({ ...tx, title: encodedTitle }),
   });
   if (!res.ok) throw new Error('Gagal menambah transaksi');
   return res.json();
@@ -81,10 +91,11 @@ async function addTransaction(tx) {
 
 async function updateTransaction(id, tx) {
   const user = getUser();
+  const encodedTitle = `${user.id}|||${tx.title}`;
   const res = await fetch(`${MOCKAPI_BASE_URL}/transactions/${id}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ ...tx, uid: String(user.id) }),
+    body: JSON.stringify({ ...tx, title: encodedTitle }),
   });
   if (!res.ok) throw new Error('Gagal mengupdate transaksi');
   return res.json();
