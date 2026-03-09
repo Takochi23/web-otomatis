@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FinTrack — Kelola Keuanganmu</title>
+    <meta name="description" content="Aplikasi manajemen keuangan pribadi dengan scan struk otomatis dan analisis grafik." />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: { sans: ['Inter', 'sans-serif'] },
+          },
+        },
+      };
+    </script>
+    <style>
+      * { font-family: 'Inter', sans-serif; }
+      body { background: #f5f3ff; }
+
+      .auth-gradient {
+        background: linear-gradient(135deg, #3b0764 0%, #6d28d9 45%, #8b5cf6 100%);
+      }
+
+      .blob1 {
+        position: absolute; width: 300px; height: 300px;
+        background: rgba(255,255,255,0.08); border-radius: 50%;
+        top: -80px; left: -80px; filter: blur(40px);
+        animation: pulse 8s ease-in-out infinite;
+      }
+      .blob2 {
+        position: absolute; width: 200px; height: 200px;
+        background: rgba(196,181,253,0.15); border-radius: 50%;
+        bottom: -60px; right: -60px; filter: blur(30px);
+        animation: pulse 8s ease-in-out 2s infinite;
+      }
+      .blob3 {
+        position: absolute; width: 150px; height: 150px;
+        background: rgba(255,255,255,0.06); border-radius: 50%;
+        top: 50%; left: 60%; filter: blur(20px);
+        animation: pulse 8s ease-in-out 4s infinite;
+      }
+
+      @keyframes pulse {
+        0%, 100% { transform: scale(1); opacity: 0.8; }
+        50% { transform: scale(1.15); opacity: 1; }
+      }
+
+      .feature-card {
+        background: rgba(255,255,255,0.12);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255,255,255,0.15);
+        border-radius: 16px;
+        padding: 16px;
+        transition: transform 0.2s ease, background 0.2s ease;
+      }
+      .feature-card:hover {
+        transform: translateY(-2px);
+        background: rgba(255,255,255,0.18);
+      }
+
+      .form-card {
+        background: white;
+        border-radius: 24px;
+        box-shadow: 0 20px 60px rgba(109,40,217,0.12), 0 4px 20px rgba(0,0,0,0.06);
+        padding: 40px;
+        width: 100%;
+        max-width: 420px;
+      }
+
+      .input-wrap { position: relative; }
+      .input-wrap i {
+        position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
+        color: #9ca3af; font-size: 0.875rem; pointer-events: none;
+      }
+      .input-field {
+        width: 100%; padding: 12px 16px 12px 40px;
+        border: 1.5px solid #e5e7eb; border-radius: 12px;
+        font-size: 0.875rem; outline: none; transition: all 0.2s;
+        color: #1f2937; background: #fafafa;
+      }
+      .input-field:focus {
+        border-color: #7c3aed; background: white;
+        box-shadow: 0 0 0 3px rgba(124,58,237,0.1);
+      }
+
+      .btn-primary {
+        width: 100%; padding: 13px;
+        background: linear-gradient(135deg, #6d28d9, #7c3aed, #8b5cf6);
+        color: white; border: none; border-radius: 12px;
+        font-size: 0.9rem; font-weight: 700; cursor: pointer;
+        transition: all 0.2s; letter-spacing: 0.02em;
+        box-shadow: 0 4px 20px rgba(109,40,217,0.4);
+      }
+      .btn-primary:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 8px 25px rgba(109,40,217,0.5);
+      }
+      .btn-primary:active { transform: translateY(0); }
+      .btn-primary:disabled { opacity: 0.7; cursor: not-allowed; transform: none; }
+
+      .tab-active {
+        background: white; color: #6d28d9;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08); border-radius: 10px;
+        font-weight: 700;
+      }
+      .tab-inactive { color: #9ca3af; font-weight: 500; }
+
+      .error-box {
+        background: #fef2f2; border: 1px solid #fecaca;
+        color: #dc2626; border-radius: 10px; padding: 10px 14px;
+        font-size: 0.8rem; margin-top: 4px;
+      }
+
+      .slide-in { animation: slideIn 0.3s ease; }
+      @keyframes slideIn {
+        from { opacity: 0; transform: translateX(10px); }
+        to { opacity: 1; transform: translateX(0); }
+      }
+    </style>
+  </head>
+  <body class="min-h-screen flex">
+
+    <!-- ─── Left Panel ─────────────────────────────────────────────────────── -->
+    <div class="hidden lg:flex w-[48%] auth-gradient flex-col justify-center items-center p-14 relative overflow-hidden">
+      <div class="blob1"></div>
+      <div class="blob2"></div>
+      <div class="blob3"></div>
+
+      <div class="relative z-10 text-white max-w-sm">
+        <!-- Logo -->
+        <div class="flex items-center gap-3 mb-10">
+          <div class="w-14 h-14 rounded-2xl bg-white/20 backdrop-blur flex items-center justify-center">
+            <i class="fas fa-wallet text-2xl text-white"></i>
+          </div>
+          <div>
+            <h1 class="text-3xl font-black tracking-tight">FinTrack</h1>
+            <p class="text-purple-200 text-sm">Kelola keuanganmu dengan cerdas</p>
+          </div>
+        </div>
+
+        <!-- Headline -->
+        <h2 class="text-4xl font-black leading-tight mb-4">
+          Kontrol Penuh<br/>
+          <span class="text-purple-200">Keuanganmu</span>
+        </h2>
+        <p class="text-purple-200 text-base leading-relaxed mb-10">
+          Catat pemasukan dan pengeluaran, scan struk belanja otomatis, dan pantau grafik keuangan bulanan & tahunan.
+        </p>
+
+        <!-- Feature cards -->
+        <div class="space-y-3">
+          <div class="feature-card flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center flex-shrink-0">
+              <i class="fas fa-chart-line text-white"></i>
+            </div>
+            <div>
+              <p class="font-semibold text-sm">Analisis Cerdas</p>
+              <p class="text-purple-200 text-xs">Grafik bulanan & tahunan interaktif</p>
+            </div>
+          </div>
+          <div class="feature-card flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center flex-shrink-0">
+              <i class="fas fa-camera text-white"></i>
+            </div>
+            <div>
+              <p class="font-semibold text-sm">Scan Struk Otomatis</p>
+              <p class="text-purple-200 text-xs">OCR berbasis AI, upload & selesai</p>
+            </div>
+          </div>
+          <div class="feature-card flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center flex-shrink-0">
+              <i class="fas fa-shield-halved text-white"></i>
+            </div>
+            <div>
+              <p class="font-semibold text-sm">Data Aman & Terisolasi</p>
+              <p class="text-purple-200 text-xs">Setiap akun memiliki data sendiri</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── Right Panel ────────────────────────────────────────────────────── -->
+    <div class="flex-1 flex items-center justify-center p-6 lg:p-12 bg-gradient-to-br from-purple-50 to-white">
+      <div class="form-card">
+        <!-- Mobile Logo -->
+        <div class="lg:hidden flex items-center gap-3 mb-8">
+          <div class="w-10 h-10 rounded-xl bg-purple-600 flex items-center justify-center">
+            <i class="fas fa-wallet text-white text-sm"></i>
+          </div>
+          <h1 class="text-xl font-black text-gray-800">FinTrack</h1>
+        </div>
+
+        <!-- Tab Switcher -->
+        <div class="bg-gray-100 rounded-xl p-1 flex mb-8" id="tab-bar">
+          <button id="tab-login" onclick="switchTab('login')"
+            class="flex-1 py-2.5 text-sm transition-all duration-200 tab-active">
+            Masuk
+          </button>
+          <button id="tab-register" onclick="switchTab('register')"
+            class="flex-1 py-2.5 text-sm transition-all duration-200 tab-inactive">
+            Daftar
+          </button>
+        </div>
+
+        <!-- ── Login Form ── -->
+        <div id="form-login" class="slide-in">
+          <div class="mb-7">
+            <h2 class="text-2xl font-black text-gray-900">Selamat Datang 👋</h2>
+            <p class="text-gray-500 text-sm mt-1">Masuk ke akun FinTrack Anda</p>
+          </div>
+
+          <form id="login-form" onsubmit="handleLogin(event)" class="space-y-4">
+            <div>
+              <label class="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">Email</label>
+              <div class="input-wrap">
+                <i class="fas fa-envelope"></i>
+                <input type="email" id="login-email" class="input-field"
+                  placeholder="contoh@email.com" required autocomplete="email" />
+              </div>
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">Password</label>
+              <div class="input-wrap">
+                <i class="fas fa-lock"></i>
+                <input type="password" id="login-password" class="input-field"
+                  placeholder="••••••••" required autocomplete="current-password" />
+              </div>
+            </div>
+            <div id="login-error" class="hidden error-box"></div>
+            <button type="submit" id="login-btn" class="btn-primary mt-2">
+              <i class="fas fa-arrow-right-to-bracket mr-2"></i>
+              <span id="login-btn-text">Masuk</span>
+            </button>
+          </form>
+
+          <p class="text-center text-sm text-gray-500 mt-5">
+            Belum punya akun?
+            <button onclick="switchTab('register')" class="text-purple-600 font-semibold hover:underline">Daftar sekarang</button>
+          </p>
+        </div>
+
+        <!-- ── Register Form ── -->
+        <div id="form-register" class="hidden slide-in">
+          <div class="mb-7">
+            <h2 class="text-2xl font-black text-gray-900">Buat Akun Baru ✨</h2>
+            <p class="text-gray-500 text-sm mt-1">Bergabung dengan FinTrack gratis</p>
+          </div>
+
+          <form id="register-form" onsubmit="handleRegister(event)" class="space-y-4">
+            <div>
+              <label class="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">Nama Lengkap</label>
+              <div class="input-wrap">
+                <i class="fas fa-user"></i>
+                <input type="text" id="reg-name" class="input-field"
+                  placeholder="Nama Anda" required autocomplete="name" />
+              </div>
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">Email</label>
+              <div class="input-wrap">
+                <i class="fas fa-envelope"></i>
+                <input type="email" id="reg-email" class="input-field"
+                  placeholder="contoh@email.com" required autocomplete="email" />
+              </div>
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">Password</label>
+              <div class="input-wrap">
+                <i class="fas fa-lock"></i>
+                <input type="password" id="reg-password" class="input-field"
+                  placeholder="Minimal 6 karakter" required minlength="6"
+                  autocomplete="new-password" />
+              </div>
+            </div>
+            <div id="reg-error" class="hidden error-box"></div>
+            <button type="submit" id="reg-btn" class="btn-primary mt-2">
+              <i class="fas fa-user-plus mr-2"></i>
+              <span id="reg-btn-text">Daftar Sekarang</span>
+            </button>
+          </form>
+
+          <p class="text-center text-sm text-gray-500 mt-5">
+            Sudah punya akun?
+            <button onclick="switchTab('login')" class="text-purple-600 font-semibold hover:underline">Masuk di sini</button>
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── Scripts ───────────────────────────────────────────────────────── -->
+    <script src="js/config.js"></script>
+    <script src="js/auth.js"></script>
+    <script>
+      // Redirect if already logged in
+      if (getUser()) window.location.href = 'dashboard.html';
+
+      function switchTab(tab) {
+        const loginForm = document.getElementById('form-login');
+        const regForm = document.getElementById('form-register');
+        const tLogin = document.getElementById('tab-login');
+        const tReg = document.getElementById('tab-register');
+
+        if (tab === 'login') {
+          loginForm.classList.remove('hidden');
+          loginForm.classList.add('slide-in');
+          regForm.classList.add('hidden');
+          tLogin.className = 'flex-1 py-2.5 text-sm transition-all duration-200 tab-active';
+          tReg.className = 'flex-1 py-2.5 text-sm transition-all duration-200 tab-inactive';
+        } else {
+          regForm.classList.remove('hidden');
+          regForm.classList.add('slide-in');
+          loginForm.classList.add('hidden');
+          tReg.className = 'flex-1 py-2.5 text-sm transition-all duration-200 tab-active';
+          tLogin.className = 'flex-1 py-2.5 text-sm transition-all duration-200 tab-inactive';
+        }
+      }
+
+      async function handleLogin(e) {
+        e.preventDefault();
+        const email = document.getElementById('login-email').value;
+        const password = document.getElementById('login-password').value;
+        const errorDiv = document.getElementById('login-error');
+        const btn = document.getElementById('login-btn');
+        const btnText = document.getElementById('login-btn-text');
+
+        btn.disabled = true;
+        btnText.textContent = 'Memproses...';
+        errorDiv.classList.add('hidden');
+
+        try {
+          await login(email, password);
+          window.location.href = 'dashboard.html';
+        } catch (err) {
+          errorDiv.textContent = err.message;
+          errorDiv.classList.remove('hidden');
+        } finally {
+          btn.disabled = false;
+          btnText.textContent = 'Masuk';
+        }
+      }
+
+      async function handleRegister(e) {
+        e.preventDefault();
+        const name = document.getElementById('reg-name').value.trim();
+        const email = document.getElementById('reg-email').value;
+        const password = document.getElementById('reg-password').value;
+        const errorDiv = document.getElementById('reg-error');
+        const btn = document.getElementById('reg-btn');
+        const btnText = document.getElementById('reg-btn-text');
+
+        btn.disabled = true;
+        btnText.textContent = 'Memproses...';
+        errorDiv.classList.add('hidden');
+
+        try {
+          await register(name, email, password);
+          window.location.href = 'dashboard.html';
+        } catch (err) {
+          errorDiv.textContent = err.message;
+          errorDiv.classList.remove('hidden');
+        } finally {
+          btn.disabled = false;
+          btnText.textContent = 'Daftar Sekarang';
+        }
+      }
+    </script>
+  </body>
+</html>

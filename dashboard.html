@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FinTrack — Dashboard</title>
+    <meta name="description" content="Dashboard manajemen keuangan pribadi FinTrack." />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://unpkg.com/tesseract.js@4/dist/tesseract.min.js"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: { sans: ['Inter', 'sans-serif'] },
+          },
+        },
+      };
+    </script>
+    <style>
+      * { font-family: 'Inter', sans-serif; }
+
+      /* Sidebar */
+      .sidebar {
+        background: linear-gradient(180deg, #3b0764 0%, #5b21b6 50%, #6d28d9 100%);
+        width: 240px;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        position: fixed;
+        top: 0; left: 0; bottom: 0;
+        z-index: 100;
+        transition: transform 0.3s ease;
+      }
+      .sidebar-overlay {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,0.5);
+        z-index: 99;
+      }
+
+      /* Balance card */
+      .balance-card {
+        background: linear-gradient(135deg, #5b21b6, #7c3aed, #8b5cf6);
+        box-shadow: 0 8px 32px rgba(109,40,217,0.4);
+      }
+
+      /* Glassmorphism cards */
+      .glass-card {
+        background: white;
+        border: 1px solid rgba(0,0,0,0.06);
+        box-shadow: 0 4px 24px rgba(0,0,0,0.06);
+        border-radius: 20px;
+      }
+
+      /* Form inputs */
+      .form-input {
+        width: 100%;
+        padding: 10px 14px;
+        border: 1.5px solid #e5e7eb;
+        border-radius: 10px;
+        font-size: 0.85rem;
+        outline: none;
+        transition: all 0.2s;
+        background: #fafafa;
+        color: #1f2937;
+      }
+      .form-input:focus {
+        border-color: #7c3aed;
+        background: white;
+        box-shadow: 0 0 0 3px rgba(124,58,237,0.08);
+      }
+
+      /* Submit button */
+      .btn-submit {
+        width: 100%;
+        padding: 11px;
+        background: linear-gradient(135deg, #6d28d9, #8b5cf6);
+        color: white;
+        border: none;
+        border-radius: 10px;
+        font-weight: 700;
+        font-size: 0.85rem;
+        cursor: pointer;
+        transition: all 0.2s;
+        box-shadow: 0 4px 14px rgba(109,40,217,0.35);
+      }
+      .btn-submit:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(109,40,217,0.45); }
+      .btn-submit:disabled { opacity: 0.7; cursor: not-allowed; transform: none; }
+
+      /* Drop zone */
+      .drop-zone {
+        border: 2px dashed #d8b4fe;
+        border-radius: 16px;
+        padding: 48px 24px;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.2s;
+        background: #faf5ff;
+      }
+      .drop-zone:hover, .drop-zone.drag-over {
+        border-color: #7c3aed;
+        background: #f5f3ff;
+      }
+
+      /* Scrollbar */
+      ::-webkit-scrollbar { width: 5px; }
+      ::-webkit-scrollbar-track { background: transparent; }
+      ::-webkit-scrollbar-thumb { background: #d8b4fe; border-radius: 10px; }
+
+      /* Progress bar */
+      .progress-bar-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #7c3aed, #a855f7);
+        border-radius: 999px;
+        transition: width 0.3s ease;
+      }
+
+      /* Stat card hover */
+      .stat-card { transition: transform 0.2s, box-shadow 0.2s; }
+      .stat-card:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(0,0,0,0.1); }
+
+      /* Mobile */
+      @media (max-width: 768px) {
+        .sidebar { transform: translateX(-100%); }
+        .sidebar.open { transform: translateX(0); }
+        .sidebar-overlay.open { display: block; }
+        #main-content { margin-left: 0 !important; }
+      }
+
+      /* Toast */
+      #toast {
+        transform: translateY(100px);
+        opacity: 0;
+        transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+      }
+
+      /* Nav item */
+      .nav-item {
+        display: flex; align-items: center; gap: 10px;
+        padding: 10px 14px; border-radius: 12px;
+        font-size: 0.875rem; font-weight: 500;
+        cursor: pointer; transition: all 0.2s;
+        color: #c4b5fd; text-decoration: none;
+        border: none; background: none; width: 100%; text-align: left;
+      }
+      .nav-item:hover { background: rgba(255,255,255,0.12); color: white; }
+      .nav-item.active { background: rgba(255,255,255,0.18); color: white; font-weight: 700; }
+
+      /* Modal */
+      #modal-edit {
+        background: rgba(0,0,0,0.5);
+        z-index: 200;
+      }
+
+      /* Animate sections */
+      .section-content { animation: fadeSlide 0.3s ease; }
+      @keyframes fadeSlide {
+        from { opacity: 0; transform: translateY(8px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+
+      .summary-number { font-variant-numeric: tabular-nums; }
+    </style>
+  </head>
+
+  <body class="bg-gray-50 min-h-screen">
+
+    <!-- ─── Sidebar Overlay (mobile) ──────────────────────────────────────── -->
+    <div class="sidebar-overlay" id="sidebar-overlay" onclick="toggleSidebar()"></div>
+
+    <!-- ─── Sidebar ───────────────────────────────────────────────────────── -->
+    <aside class="sidebar" id="sidebar">
+      <!-- Logo -->
+      <div class="px-5 pt-7 pb-6 border-b border-white/10">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
+            <i class="fas fa-wallet text-white text-base"></i>
+          </div>
+          <div>
+            <h1 class="text-white font-black text-lg leading-none">FinTrack</h1>
+            <p class="text-purple-300 text-xs mt-0.5">Keuangan Pribadimu</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- User info -->
+      <div class="px-5 py-4 border-b border-white/10">
+        <div class="flex items-center gap-3">
+          <div class="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center text-white text-sm font-bold" id="user-avatar">?</div>
+          <div class="min-w-0">
+            <p class="text-white text-sm font-semibold truncate" id="sidebar-name">—</p>
+            <p class="text-purple-300 text-xs truncate" id="sidebar-email">—</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Navigation -->
+      <nav class="flex-1 px-3 pt-4 space-y-1">
+        <button data-nav="dashboard" onclick="showSection('dashboard')"
+          class="nav-item active">
+          <i class="fas fa-house w-4 text-center"></i>
+          <span>Dashboard</span>
+        </button>
+        <button data-nav="analytics" onclick="showSection('analytics')"
+          class="nav-item">
+          <i class="fas fa-chart-bar w-4 text-center"></i>
+          <span>Analitik</span>
+        </button>
+        <button data-nav="scanner" onclick="showSection('scanner')"
+          class="nav-item">
+          <i class="fas fa-camera w-4 text-center"></i>
+          <span>Scan Struk</span>
+        </button>
+      </nav>
+
+      <!-- Logout -->
+      <div class="px-3 pb-6">
+        <div class="border-t border-white/10 pt-4">
+          <button onclick="logout()" class="nav-item text-red-300 hover:bg-red-500/20 hover:text-red-200">
+            <i class="fas fa-right-from-bracket w-4 text-center"></i>
+            <span>Keluar</span>
+          </button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ─── Main Content ───────────────────────────────────────────────────── -->
+    <main id="main-content" style="margin-left: 240px;" class="min-h-screen">
+
+      <!-- ── SECTION: Dashboard ─────────────────────────────────────────── -->
+      <section id="sec-dashboard" class="section-content">
+
+        <!-- Header -->
+        <div class="bg-white border-b border-gray-100 px-6 py-4 flex items-center justify-between sticky top-0 z-50">
+          <div class="flex items-center gap-3">
+            <button onclick="toggleSidebar()" class="md:hidden w-9 h-9 flex items-center justify-center rounded-xl bg-gray-100 text-gray-600">
+              <i class="fas fa-bars text-sm"></i>
+            </button>
+            <div>
+              <h2 class="text-lg font-bold text-gray-900" id="greeting-text">Selamat Datang!</h2>
+              <p class="text-xs text-gray-400" id="date-text">—</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-3">
+            <span id="tx-count" class="text-xs bg-purple-50 text-purple-600 font-semibold px-3 py-1.5 rounded-full">0 Transaksi</span>
+            <button onclick="refreshAll()" class="w-9 h-9 flex items-center justify-center rounded-xl bg-gray-100 text-gray-500 hover:bg-purple-50 hover:text-purple-600 transition-colors" title="Refresh">
+              <i class="fas fa-rotate-right text-sm"></i>
+            </button>
+          </div>
+        </div>
+
+        <div class="p-6 space-y-6">
+
+          <!-- ── Summary Cards ── -->
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+
+            <!-- Balance -->
+            <div class="balance-card rounded-2xl p-5 stat-card col-span-1">
+              <div class="flex items-center justify-between mb-3">
+                <div class="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
+                  <i class="fas fa-wallet text-white text-base"></i>
+                </div>
+                <span class="text-purple-200 text-xs font-medium uppercase tracking-wider">Total Balance</span>
+              </div>
+              <p class="text-white text-3xl font-black summary-number" id="total-balance">Rp 0</p>
+              <p class="text-purple-200 text-xs mt-1">Saldo bersih Anda</p>
+            </div>
+
+            <!-- Income -->
+            <div class="glass-card p-5 stat-card">
+              <div class="flex items-center justify-between mb-3">
+                <div class="w-10 h-10 rounded-xl bg-green-50 flex items-center justify-center">
+                  <i class="fas fa-arrow-trend-up text-green-500 text-base"></i>
+                </div>
+                <span class="text-gray-400 text-xs font-medium uppercase tracking-wider">Pemasukan</span>
+              </div>
+              <p class="text-gray-900 text-2xl font-black summary-number text-green-600" id="total-income">Rp 0</p>
+              <p class="text-gray-400 text-xs mt-1">Total uang masuk</p>
+            </div>
+
+            <!-- Expense -->
+            <div class="glass-card p-5 stat-card">
+              <div class="flex items-center justify-between mb-3">
+                <div class="w-10 h-10 rounded-xl bg-red-50 flex items-center justify-center">
+                  <i class="fas fa-arrow-trend-down text-red-500 text-base"></i>
+                </div>
+                <span class="text-gray-400 text-xs font-medium uppercase tracking-wider">Pengeluaran</span>
+              </div>
+              <p class="text-gray-900 text-2xl font-black summary-number text-red-500" id="total-expense">Rp 0</p>
+              <p class="text-gray-400 text-xs mt-1">Total uang keluar</p>
+            </div>
+          </div>
+
+          <!-- ── Form + History ── -->
+          <div class="grid grid-cols-1 lg:grid-cols-5 gap-5">
+
+            <!-- Add Transaction Form -->
+            <div class="glass-card p-5 lg:col-span-2 transition-all duration-300" id="tx-form-card">
+              <div class="flex items-center gap-2 mb-5">
+                <div class="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center">
+                  <i class="fas fa-plus text-purple-600 text-xs"></i>
+                </div>
+                <h3 class="font-bold text-gray-800">Tambah Transaksi</h3>
+              </div>
+
+              <form id="tx-form" onsubmit="handleAddTransaction(event)" class="space-y-3.5">
+                <div>
+                  <label class="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wide">Judul</label>
+                  <input type="text" id="tx-title" class="form-input" placeholder="Contoh: Makan Siang" required />
+                </div>
+                <div>
+                  <label class="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wide">Jumlah (Rp)</label>
+                  <input type="number" id="tx-amount" class="form-input" placeholder="0" min="1" required />
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                  <div>
+                    <label class="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wide">Tipe</label>
+                    <select id="tx-type" class="form-input">
+                      <option value="out">Pengeluaran</option>
+                      <option value="in">Pemasukan</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label class="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wide">Tanggal</label>
+                    <input type="date" id="tx-date" class="form-input" required />
+                  </div>
+                </div>
+                <div>
+                  <label class="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wide">Kategori</label>
+                  <select id="tx-category" class="form-input"></select>
+                </div>
+                <button type="submit" id="submit-btn" class="btn-submit mt-1">
+                  <i class="fas fa-plus mr-2"></i>Simpan Transaksi
+                </button>
+              </form>
+            </div>
+
+            <!-- Transaction History -->
+            <div class="glass-card lg:col-span-3 flex flex-col">
+              <div class="flex items-center justify-between px-5 pt-5 pb-4 border-b border-gray-50">
+                <div class="flex items-center gap-2">
+                  <div class="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center">
+                    <i class="fas fa-clock-rotate-left text-blue-500 text-xs"></i>
+                  </div>
+                  <h3 class="font-bold text-gray-800">Riwayat</h3>
+                </div>
+                <span class="text-xs text-gray-400 bg-gray-50 px-2.5 py-1 rounded-full" id="tx-count-badge">0 data</span>
+              </div>
+
+              <!-- Loading state -->
+              <div id="history-loading" class="flex items-center justify-center py-12">
+                <div class="flex flex-col items-center gap-3">
+                  <div class="w-10 h-10 border-3 border-purple-200 border-t-purple-600 rounded-full animate-spin" style="border-width:3px"></div>
+                  <p class="text-sm text-gray-400">Memuat data...</p>
+                </div>
+              </div>
+
+              <!-- Empty state -->
+              <div id="history-empty" class="hidden flex-1 flex flex-col items-center justify-center py-12 px-6 text-center">
+                <div class="w-16 h-16 rounded-2xl bg-gray-50 flex items-center justify-center mb-3">
+                  <i class="fas fa-receipt text-gray-300 text-2xl"></i>
+                </div>
+                <p class="text-gray-500 font-semibold text-sm">Belum ada transaksi</p>
+                <p class="text-gray-400 text-xs mt-1">Tambah transaksi pertama Anda di sebelah kiri</p>
+              </div>
+
+              <!-- Table -->
+              <div class="overflow-x-auto flex-1">
+                <table class="w-full min-w-[480px]">
+                  <thead>
+                    <tr class="border-b border-gray-50">
+                      <th class="text-left py-3 px-5 text-xs font-semibold text-gray-400 uppercase tracking-wide">Detail</th>
+                      <th class="text-left py-3 px-5 text-xs font-semibold text-gray-400 uppercase tracking-wide">Status</th>
+                      <th class="text-left py-3 px-5 text-xs font-semibold text-gray-400 uppercase tracking-wide">Jumlah</th>
+                      <th class="text-left py-3 px-5 text-xs font-semibold text-gray-400 uppercase tracking-wide">Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody id="history-tbody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── SECTION: Analytics ─────────────────────────────────────────── -->
+      <section id="sec-analytics" class="hidden section-content p-6">
+
+        <!-- Header -->
+        <div class="mb-6 flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h2 class="text-2xl font-black text-gray-900">Analitik Keuangan</h2>
+            <p class="text-gray-500 text-sm mt-0.5">Rekap pemasukan & pengeluaran</p>
+          </div>
+          <div class="flex items-center gap-3">
+            <select id="chart-month" class="form-input !w-auto" onchange="renderCharts(allTransactions)">
+              <option value="1">Januari</option><option value="2">Februari</option>
+              <option value="3">Maret</option><option value="4">April</option>
+              <option value="5">Mei</option><option value="6">Juni</option>
+              <option value="7">Juli</option><option value="8">Agustus</option>
+              <option value="9">September</option><option value="10">Oktober</option>
+              <option value="11">November</option><option value="12">Desember</option>
+            </select>
+            <select id="chart-year" class="form-input !w-auto" onchange="renderCharts(allTransactions)"></select>
+          </div>
+        </div>
+
+        <div class="space-y-5">
+          <!-- Monthly Chart -->
+          <div class="glass-card p-5">
+            <div class="flex items-center gap-2 mb-4">
+              <div class="w-8 h-8 rounded-lg bg-purple-50 flex items-center justify-center">
+                <i class="fas fa-calendar-days text-purple-500 text-xs"></i>
+              </div>
+              <div>
+                <h3 class="font-bold text-gray-800 text-sm">Rekap Bulanan</h3>
+                <p class="text-xs text-gray-400">Pemasukan vs Pengeluaran per hari</p>
+              </div>
+            </div>
+            <div style="height: 280px; position: relative;">
+              <canvas id="monthly-chart"></canvas>
+            </div>
+          </div>
+
+          <!-- Yearly Chart -->
+          <div class="glass-card p-5">
+            <div class="flex items-center gap-2 mb-4">
+              <div class="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center">
+                <i class="fas fa-chart-line text-blue-500 text-xs"></i>
+              </div>
+              <div>
+                <h3 class="font-bold text-gray-800 text-sm">Rekap Tahunan</h3>
+                <p class="text-xs text-gray-400">Tren keuangan sepanjang tahun</p>
+              </div>
+            </div>
+            <div style="height: 280px; position: relative;">
+              <canvas id="yearly-chart"></canvas>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── SECTION: Scanner ───────────────────────────────────────────── -->
+      <section id="sec-scanner" class="hidden section-content p-6">
+        <div class="mb-6">
+          <h2 class="text-2xl font-black text-gray-900">Scan Struk Belanja</h2>
+          <p class="text-gray-500 text-sm mt-0.5">Upload foto struk, sistem akan otomatis membaca nominal dan judul</p>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+
+          <!-- Upload area -->
+          <div class="glass-card p-5">
+            <h3 class="font-bold text-gray-800 mb-4 flex items-center gap-2">
+              <i class="fas fa-upload text-purple-500 text-sm"></i> Upload Struk
+            </h3>
+
+            <!-- Drop zone -->
+            <div class="drop-zone" id="drop-zone">
+              <i class="fas fa-cloud-arrow-up text-purple-400 text-4xl mb-3"></i>
+              <p class="font-semibold text-gray-700 text-sm">Drag & drop foto struk di sini</p>
+              <p class="text-gray-400 text-xs mt-1">atau klik untuk pilih file</p>
+              <p class="text-gray-300 text-xs mt-3">Mendukung: JPG, PNG, WEBP</p>
+            </div>
+            <input type="file" id="receipt-input" accept="image/*" class="hidden" />
+
+            <!-- Preview -->
+            <div id="preview-wrap" class="hidden mt-4">
+              <p class="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wide">Preview</p>
+              <img id="receipt-preview" src="" alt="Receipt preview"
+                class="w-full max-h-64 object-contain rounded-xl border border-gray-100 bg-gray-50" />
+            </div>
+
+            <!-- Scan button -->
+            <button id="scan-btn" class="btn-submit hidden mt-4">
+              <i class="fas fa-magic mr-2"></i>Scan Struk
+            </button>
+
+            <!-- Status -->
+            <p id="ocr-status" class="text-sm text-purple-600 font-medium mt-3"></p>
+
+            <!-- Progress -->
+            <div id="ocr-progress-wrap" class="hidden mt-2">
+              <div class="w-full bg-gray-100 rounded-full" style="height:6px;">
+                <div id="ocr-progress-bar" class="progress-bar-fill" style="width:0%;height:100%;border-radius:999px;"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Results area -->
+          <div class="glass-card p-5">
+            <h3 class="font-bold text-gray-800 mb-4 flex items-center gap-2">
+              <i class="fas fa-file-lines text-green-500 text-sm"></i> Hasil Scan
+            </h3>
+
+            <div id="ocr-result" class="hidden">
+              <!-- Detected fields -->
+              <div class="space-y-3 mb-5">
+                <div class="bg-green-50 rounded-xl p-4">
+                  <p class="text-xs font-semibold text-green-600 uppercase tracking-wide mb-1">Judul Terdeteksi</p>
+                  <p class="font-bold text-gray-800 text-sm" id="ocr-detected-title">—</p>
+                </div>
+                <div class="bg-blue-50 rounded-xl p-4">
+                  <p class="text-xs font-semibold text-blue-600 uppercase tracking-wide mb-1">Nominal Terdeteksi</p>
+                  <p class="font-bold text-gray-800 text-sm" id="ocr-detected-amount">—</p>
+                </div>
+              </div>
+
+              <!-- Use result button -->
+              <button id="use-result-btn" class="btn-submit hidden mb-4">
+                <i class="fas fa-arrow-right-to-bracket mr-2"></i>Gunakan Hasil Ini
+              </button>
+
+              <!-- Raw text -->
+              <div>
+                <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Teks Mentah OCR</p>
+                <pre id="ocr-raw-text"
+                  class="bg-gray-50 border border-gray-100 rounded-xl p-4 text-xs text-gray-600 whitespace-pre-wrap font-mono max-h-48 overflow-y-auto"></pre>
+              </div>
+            </div>
+
+            <!-- Empty state -->
+            <div id="ocr-empty" class="flex flex-col items-center justify-center py-16 text-center">
+              <div class="w-16 h-16 rounded-2xl bg-purple-50 flex items-center justify-center mb-4">
+                <i class="fas fa-camera text-purple-300 text-2xl"></i>
+              </div>
+              <p class="text-gray-500 font-semibold text-sm">Belum ada hasil</p>
+              <p class="text-gray-400 text-xs mt-1">Upload dan scan struk untuk melihat hasil OCR</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- ─── Edit Modal ─────────────────────────────────────────────────────── -->
+    <div id="modal-edit" class="hidden fixed inset-0 items-center justify-center p-4" role="dialog" aria-modal="true">
+      <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6"
+        style="box-shadow: 0 25px 60px rgba(0,0,0,0.2);">
+        <div class="flex items-center justify-between mb-5">
+          <h3 class="text-lg font-black text-gray-900">Edit Transaksi</h3>
+          <button onclick="closeEditModal()"
+            class="w-8 h-8 flex items-center justify-center rounded-xl bg-gray-100 text-gray-500 hover:bg-gray-200 transition-colors">
+            <i class="fas fa-xmark text-sm"></i>
+          </button>
+        </div>
+
+        <form id="edit-form" onsubmit="handleEditTransaction(event)" class="space-y-3.5">
+          <div>
+            <label class="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wide">Judul</label>
+            <input type="text" id="edit-title" class="form-input" required />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wide">Jumlah (Rp)</label>
+            <input type="number" id="edit-amount" class="form-input" min="1" required />
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wide">Tipe</label>
+              <select id="edit-type" class="form-input">
+                <option value="out">Pengeluaran</option>
+                <option value="in">Pemasukan</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wide">Tanggal</label>
+              <input type="date" id="edit-date" class="form-input" required />
+            </div>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wide">Kategori</label>
+            <select id="edit-category" class="form-input"></select>
+          </div>
+          <div class="flex gap-3 pt-1">
+            <button type="button" onclick="closeEditModal()"
+              class="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-600 text-sm font-semibold hover:bg-gray-50 transition-colors">
+              Batal
+            </button>
+            <button type="submit" id="edit-submit-btn"
+              class="flex-1 py-2.5 rounded-xl text-white text-sm font-bold transition-all"
+              style="background: linear-gradient(135deg, #6d28d9, #8b5cf6);">
+              Simpan Perubahan
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- ─── Toast ──────────────────────────────────────────────────────────── -->
+    <div id="toast" class="fixed bottom-6 right-6 z-[999] px-5 py-3.5 rounded-2xl shadow-2xl text-sm font-semibold flex items-center gap-2.5 bg-green-500 text-white">
+      <i class="fas fa-check-circle"></i>
+      <span id="toast-msg"></span>
+    </div>
+
+    <!-- ─── Scripts ───────────────────────────────────────────────────────── -->
+    <script src="js/config.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/dashboard.js"></script>
+    <script src="js/charts.js"></script>
+    <script src="js/ocr.js"></script>
+    <script>
+      // ── Auth guard ──────────────────────────────────────────────────────────
+      requireAuth();
+
+      // ── Init ────────────────────────────────────────────────────────────────
+      document.addEventListener('DOMContentLoaded', async () => {
+        const user = getUser();
+
+        // Set user info in sidebar
+        document.getElementById('sidebar-name').textContent = user.name;
+        document.getElementById('sidebar-email').textContent = user.email;
+        document.getElementById('user-avatar').textContent = user.name.charAt(0).toUpperCase();
+
+        // Set greeting
+        const hour = new Date().getHours();
+        const greeting =
+          hour < 11 ? 'Selamat Pagi' :
+          hour < 15 ? 'Selamat Siang' :
+          hour < 18 ? 'Selamat Sore' : 'Selamat Malam';
+        document.getElementById('greeting-text').textContent =
+          `${greeting}, ${user.name.split(' ')[0]}! 👋`;
+
+        // Set date
+        document.getElementById('date-text').textContent =
+          new Date().toLocaleDateString('id-ID', {
+            weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
+          });
+
+        // Populate categories
+        populateCategories();
+
+        // Default date to today
+        document.getElementById('tx-date').value =
+          new Date().toISOString().split('T')[0];
+
+        // Set chart selectors
+        const now = new Date();
+        const yearSel = document.getElementById('chart-year');
+        const monthSel = document.getElementById('chart-month');
+        for (let y = now.getFullYear(); y >= now.getFullYear() - 4; y--) {
+          yearSel.innerHTML += `<option value="${y}" ${y === now.getFullYear() ? 'selected' : ''}>${y}</option>`;
+        }
+        monthSel.value = now.getMonth() + 1;
+
+        // Set active nav
+        showSection('dashboard');
+
+        // Load transactions
+        await refreshAll();
+
+        // Setup drop zone
+        setupDropZone();
+
+        // Handle ocr-result visibility
+        document.getElementById('ocr-result').addEventListener('DOMSubtreeModified', () => {
+          const hasResult = !document.getElementById('ocr-result').classList.contains('hidden');
+          const empty = document.getElementById('ocr-empty');
+          if (hasResult) empty.classList.add('hidden');
+          else empty.classList.remove('hidden');
+        });
+      });
+
+      // ── showSection override with active nav tracking ────────────────────────
+      const _showSection = showSection;
+      // Already defined in dashboard.js
+
+      // ── Sidebar mobile toggle ────────────────────────────────────────────────
+      function toggleSidebar() {
+        document.getElementById('sidebar').classList.toggle('open');
+        document.getElementById('sidebar-overlay').classList.toggle('open');
+      }
+
+      // ── tx-count-badge sync ──────────────────────────────────────────────────
+      const origUpdateSummary = updateSummaryCards;
+      // Note: tx-count-badge reflects tx-count
+      const observer = new MutationObserver(() => {
+        const el = document.getElementById('tx-count');
+        const badge = document.getElementById('tx-count-badge');
+        if (el && badge) badge.textContent = el.textContent;
+      });
+      document.addEventListener('DOMContentLoaded', () => {
+        const el = document.getElementById('tx-count');
+        if (el) observer.observe(el, { childList: true, characterData: true, subtree: true });
+      });
+    </script>
+  </body>
+</html>
