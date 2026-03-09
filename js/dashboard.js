@@ -46,12 +46,17 @@ function formatDate(dateStr) {
 // ─── API calls ────────────────────────────────────────────────────────────────
 async function fetchTransactions() {
   const user = getUser();
-  const res = await fetch(
-    `${MOCKAPI_BASE_URL}/transactions?userId=${user.id}`
-  );
+  // Fetch all transactions then filter client-side.
+  // MockAPI's ?userId= query can silently mismatch when the stored value
+  // format differs (e.g. "userId 3" vs "3"), so we compare both as strings.
+  const res = await fetch(`${MOCKAPI_BASE_URL}/transactions`);
   if (!res.ok) throw new Error('Gagal mengambil data transaksi');
   const data = await res.json();
-  allTransactions = data.sort((a, b) => new Date(b.date) - new Date(a.date));
+  const userId = String(user.id);
+  const filtered = data.filter(
+    t => String(t.userId) === userId
+  );
+  allTransactions = filtered.sort((a, b) => new Date(b.date) - new Date(a.date));
   return allTransactions;
 }
 

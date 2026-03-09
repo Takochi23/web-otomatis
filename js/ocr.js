@@ -58,45 +58,75 @@ function parseReceiptText(text) {
   let amount = null;
   let title = null;
 
-  // Try to extract the highest "total" amount
-  const amountPatterns = [
-    /(?:total|jumlah|grand\s*total|tagihan|bayar|tunai|cash)[^\d]*([\d.,]+)/i,
-    /rp\.?\s*([\d.,]+)/i,
-    /idr\s*([\d.,]+)/i,
+  // Maximum sensible receipt amount (100 million IDR)
+  const MAX_RECEIPT_AMOUNT = 100_000_000;
+
+  // Helper: parse number string like "75.400" or "75,400" → 75400
+  function parseNum(raw) {
+    // Remove all dots (thousand separators), replace comma with dot for decimals
+    const cleaned = raw.replace(/\./g, '').replace(',', '.');
+    return parseFloat(cleaned);
+  }
+
+  // Priority 1: lines containing "TOTAL" keyword (excluding "SUBTOTAL","DPP","PPN")
+  // These are the most reliable indicators of the final amount
+  const totalPatterns = [
+    /\bTOTAL\b[^\d]*([\d.,]+)/i,
+    /\bGRAND\s*TOTAL\b[^\d]*([\d.,]+)/i,
+    /\bJUMLAH\b[^\d]*([\d.,]+)/i,
+    /\bTAGIHAN\b[^\d]*([\d.,]+)/i,
   ];
 
-  let candidates = [];
+  let totalCandidates = [];
   for (const line of lines) {
-    for (const pattern of amountPatterns) {
+    // Skip lines that are clearly not totals
+    if (/\b(subtotal|ppn|dpp|diskon|discount|kembali|change|vc |voucher)\b/i.test(line)) continue;
+    for (const pattern of totalPatterns) {
       const match = line.match(pattern);
       if (match) {
-        const raw = match[1].replace(/\./g, '').replace(',', '.');
-        const num = parseFloat(raw);
-        if (!isNaN(num) && num >= 100) candidates.push(num);
+        const num = parseNum(match[1]);
+        if (!isNaN(num) && num >= 100 && num <= MAX_RECEIPT_AMOUNT) {
+          totalCandidates.push(num);
+        }
       }
     }
   }
 
-  // Prefer the largest amount that contains "total" keyword
-  if (candidates.length > 0) {
-    amount = Math.max(...candidates);
+  if (totalCandidates.length > 0) {
+    // Among TOTAL lines, pick the smallest (to avoid TUNAI/cash paid which is higher)
+    amount = Math.min(...totalCandidates);
   } else {
-    // Fallback: look for standalone large numbers
-    const numPattern = /\b([\d]{4,})\b/g;
-    let m;
-    while ((m = numPattern.exec(text)) !== null) {
-      const n = parseInt(m[1]);
-      if (n >= 1000) candidates.push(n);
+    // Priority 2: Rp / IDR patterns, but only realistic amounts
+    const rpPatterns = [
+      /(?:rp\.?|idr)\s*([\d.,]+)/i,
+      /(?:bayar|tunai|cash)[^\d]*([\d.,]+)/i,
+    ];
+    let rpCandidates = [];
+    for (const line of lines) {
+      if (/\b(kembali|change|ppn|dpp)\b/i.test(line)) continue;
+      for (const pattern of rpPatterns) {
+        const match = line.match(pattern);
+        if (match) {
+          const num = parseNum(match[1]);
+          if (!isNaN(num) && num >= 100 && num <= MAX_RECEIPT_AMOUNT) {
+            rpCandidates.push(num);
+          }
+        }
+      }
     }
-    if (candidates.length > 0) amount = Math.max(...candidates);
+    if (rpCandidates.length > 0) {
+      amount = Math.min(...rpCandidates);
+    }
+    // No further fallback to avoid picking up phone numbers / barcodes
   }
 
-  // Extract title: first meaningful multi-letter line
+  // Extract title: first meaningful multi-letter line (skip lines that look like phone numbers or codes)
   for (const line of lines) {
     if (
       line.length >= 3 &&
       /[a-zA-Z]/.test(line) &&
-      !/^\d+$/.test(line)
+      !/^\d+$/.test(line) &&
+      !/^\d{8,}/.test(line)          // skip lines starting with long numbers (phone/barcode)
     ) {
       title = line.length > 50 ? line.substring(0, 50) : line;
       break;
