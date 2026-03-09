@@ -63,8 +63,11 @@ function parseReceiptText(text) {
 
   // Helper: parse number string like "75.400" or "75,400" → 75400
   function parseNum(raw) {
-    const cleaned = raw.replace(/\./g, '').replace(',', '.');
-    return parseFloat(cleaned);
+    // 1. Remove trailing .00 or ,00 (decimals)
+    let cleaned = raw.replace(/[.,]00$/g, '');
+    // 2. Remove all non-digits (like dots or commas acting as thousands separator)
+    cleaned = cleaned.replace(/[^0-9]/g, '');
+    return parseInt(cleaned, 10);
   }
 
   // Priority 1: lines containing "TOTAL" keyword
