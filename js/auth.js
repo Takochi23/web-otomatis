@@ -24,7 +24,7 @@ function logout() {
 // ─── Auth API ─────────────────────────────────────────────────────────────────
 async function login(email, password) {
   const res = await fetch(
-    `${MOCKAPI_BASE_URL}/users?email=${encodeURIComponent(email)}`
+    `${MOCKAPI_BASE_URL}/user?email=${encodeURIComponent(email)}`
   );
   if (!res.ok) throw new Error('Gagal terhubung ke server');
 
@@ -43,7 +43,7 @@ async function login(email, password) {
 async function register(name, email, password) {
   // Check email uniqueness
   const checkRes = await fetch(
-    `${MOCKAPI_BASE_URL}/users?email=${encodeURIComponent(email)}`
+    `${MOCKAPI_BASE_URL}/user?email=${encodeURIComponent(email)}`
   );
   if (!checkRes.ok) throw new Error('Gagal terhubung ke server');
 
@@ -52,7 +52,7 @@ async function register(name, email, password) {
     throw new Error('Email sudah terdaftar. Silakan login.');
   }
 
-  const res = await fetch(`${MOCKAPI_BASE_URL}/users`, {
+  const res = await fetch(`${MOCKAPI_BASE_URL}/user`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ name, email, password }),
