@@ -63,13 +63,11 @@ function parseReceiptText(text) {
 
   // Helper: parse number string like "75.400" or "75,400" → 75400
   function parseNum(raw) {
-    // Remove all dots (thousand separators), replace comma with dot for decimals
     const cleaned = raw.replace(/\./g, '').replace(',', '.');
     return parseFloat(cleaned);
   }
 
-  // Priority 1: lines containing "TOTAL" keyword (excluding "SUBTOTAL","DPP","PPN")
-  // These are the most reliable indicators of the final amount
+  // Priority 1: lines containing "TOTAL" keyword
   const totalPatterns = [
     /\bTOTAL\b[^\d]*([\d.,]+)/i,
     /\bGRAND\s*TOTAL\b[^\d]*([\d.,]+)/i,
@@ -79,7 +77,6 @@ function parseReceiptText(text) {
 
   let totalCandidates = [];
   for (const line of lines) {
-    // Skip lines that are clearly not totals
     if (/\b(subtotal|ppn|dpp|diskon|discount|kembali|change|vc |voucher)\b/i.test(line)) continue;
     for (const pattern of totalPatterns) {
       const match = line.match(pattern);
@@ -93,10 +90,10 @@ function parseReceiptText(text) {
   }
 
   if (totalCandidates.length > 0) {
-    // Among TOTAL lines, pick the smallest (to avoid TUNAI/cash paid which is higher)
+    // Pick the smallest among TOTAL lines to avoid taking cash given by customer
     amount = Math.min(...totalCandidates);
   } else {
-    // Priority 2: Rp / IDR patterns, but only realistic amounts
+    // Priority 2: Rp / IDR keywords
     const rpPatterns = [
       /(?:rp\.?|idr)\s*([\d.,]+)/i,
       /(?:bayar|tunai|cash)[^\d]*([\d.,]+)/i,
@@ -114,10 +111,32 @@ function parseReceiptText(text) {
         }
       }
     }
+
     if (rpCandidates.length > 0) {
       amount = Math.min(...rpCandidates);
+    } else {
+      // Priority 3: Ultimate Fallback (if OCR cuts off bottom part)
+      // Look for the largest numbers across the entire text, ignoring long codes/phones
+      let fallbackCandidates = [];
+      const standaloneNumRegex = /\b([\d.,]+)\b/g;
+      
+      let m;
+      while ((m = standaloneNumRegex.exec(text)) !== null) {
+        let rawStr = m[1];
+        // Skip strings that look like phone numbers (starts with 08, or very long numbers without separators)
+        if (/^0\d+/.test(rawStr)) continue; // Starts with zero
+        if (rawStr.replace(/[.,]/g, '').length >= 9) continue; // 9+ contiguous digits (like 08113336422 or long IDs)
+        
+        const num = parseNum(rawStr);
+        if (!isNaN(num) && num >= 1000 && num <= MAX_RECEIPT_AMOUNT) {
+          fallbackCandidates.push(num);
+        }
+      }
+      
+      if (fallbackCandidates.length > 0) {
+        amount = Math.max(...fallbackCandidates); // Get the largest valid number
+      }
     }
-    // No further fallback to avoid picking up phone numbers / barcodes
   }
 
   // Extract title: first meaningful multi-letter line (skip lines that look like phone numbers or codes)
@@ -126,7 +145,7 @@ function parseReceiptText(text) {
       line.length >= 3 &&
       /[a-zA-Z]/.test(line) &&
       !/^\d+$/.test(line) &&
-      !/^\d{8,}/.test(line)          // skip lines starting with long numbers (phone/barcode)
+      !/^\d{8,}/.test(line)
     ) {
       title = line.length > 50 ? line.substring(0, 50) : line;
       break;
